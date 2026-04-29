@@ -26,6 +26,10 @@ function Write-Failure {
 }
 
 function Wait-ForExit {
+    if ($env:HEIC_TO_JPG_NO_PAUSE -eq '1') {
+        return
+    }
+
     Write-Host
     Read-Host 'Press Enter to exit'
 }
@@ -108,133 +112,144 @@ function Get-UniqueOutputPath {
     }
 }
 
-$defaultFolder = Join-Path -Path $env:USERPROFILE -ChildPath 'convert'
-$usingDefaultFolder = [string]::IsNullOrWhiteSpace($FolderPath)
+function Invoke-PhotoConversion {
+    param(
+        [string]$FolderPath
+    )
 
-if ($usingDefaultFolder) {
-    $targetFolder = $defaultFolder
-}
-else {
-    try {
-        $resolved = Resolve-Path -LiteralPath $FolderPath -ErrorAction Stop
-        $targetFolder = $resolved.ProviderPath
+    $defaultFolder = Join-Path -Path $env:USERPROFILE -ChildPath 'convert'
+    $usingDefaultFolder = [string]::IsNullOrWhiteSpace($FolderPath)
+
+    if ($usingDefaultFolder) {
+        $targetFolder = $defaultFolder
     }
-    catch {
-        Write-Failure "The custom folder does not exist: $FolderPath"
-        Wait-ForExit
-        exit 1
-    }
-}
-
-if ($usingDefaultFolder -and -not (Test-Path -LiteralPath $targetFolder)) {
-    Write-Info "Creating default folder: $targetFolder"
-    New-Item -Path $targetFolder -ItemType Directory | Out-Null
-
-    try {
-        New-DesktopShortcut -TargetFolder $targetFolder -ShortcutName 'Convert Photos'
-        Write-Success 'Created desktop shortcut: Convert Photos'
-    }
-    catch {
-        Write-Warn "Could not create desktop shortcut. $_"
-    }
-
-    Write-Host
-    Write-Info 'First-time setup complete.'
-    Write-Host "Place your HEIC photos in: $targetFolder"
-    Write-Host 'Then run this script again to start conversion.'
-    Wait-ForExit
-    exit 0
-}
-
-if (-not (Test-Path -LiteralPath $targetFolder -PathType Container)) {
-    Write-Failure "Folder not found: $targetFolder"
-    Wait-ForExit
-    exit 1
-}
-
-$ffmpegCommand = Get-Command ffmpeg -ErrorAction SilentlyContinue
-if (-not $ffmpegCommand) {
-    Show-FfmpegInstallHelp
-    Wait-ForExit
-    exit 1
-}
-
-$ffmpegPath = $ffmpegCommand.Source
-if (-not (Test-HeicSupport -FfmpegPath $ffmpegPath)) {
-    Show-HeicSupportHelp
-    Wait-ForExit
-    exit 1
-}
-
-Write-Info "Scanning for HEIC files in: $targetFolder"
-
-$heicFiles = Get-ChildItem -Path $targetFolder -Recurse -File | Where-Object {
-    $_.Extension -ieq '.heic'
-}
-
-if (-not $heicFiles -or $heicFiles.Count -eq 0) {
-    Write-Warn 'No HEIC files found. Add files and run again.'
-    Wait-ForExit
-    exit 0
-}
-
-$convertedCount = 0
-$skippedCount = 0
-$failedCount = 0
-$deletedCount = 0
-
-Write-Info ("Found {0} HEIC file(s). Starting conversion..." -f $heicFiles.Count)
-Write-Host
-
-foreach ($file in $heicFiles) {
-    $directory = $file.DirectoryName
-    $sourcePath = $file.FullName
-    $baseOutputName = "{0}_converted" -f $file.BaseName
-    $expectedOutput = Join-Path -Path $directory -ChildPath ("$baseOutputName.jpg")
-
-    if (Test-Path -LiteralPath $expectedOutput) {
-        Write-Warn "Skipping (already converted): $sourcePath"
-        $skippedCount++
-        continue
-    }
-
-    $outputPath = Get-UniqueOutputPath -Directory $directory -BaseName $baseOutputName -Extension '.jpg'
-
-    Write-Info "Converting: $sourcePath"
-    Write-Host "      -> $outputPath"
-
-    try {
-        & $ffmpegPath -hide_banner -loglevel error -i $sourcePath -q:v 2 $outputPath
-        if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $outputPath)) {
-            throw "ffmpeg exited with code $LASTEXITCODE"
-        }
-
-        $convertedCount++
-        Write-Success "Converted: $outputPath"
-
+    else {
         try {
-            Remove-Item -LiteralPath $sourcePath -Force
-            $deletedCount++
-            Write-Success "Deleted original: $sourcePath"
+            $resolved = Resolve-Path -LiteralPath $FolderPath -ErrorAction Stop
+            $targetFolder = $resolved.ProviderPath
         }
         catch {
-            Write-Warn "Converted, but could not delete original: $sourcePath. $_"
+            Write-Failure "The custom folder does not exist: $FolderPath"
+            Wait-ForExit
+            return 1
         }
     }
-    catch {
-        $failedCount++
-        Write-Failure "Failed: $sourcePath"
-        Write-Host "       Reason: $_"
+
+    if ($usingDefaultFolder -and -not (Test-Path -LiteralPath $targetFolder)) {
+        Write-Info "Creating default folder: $targetFolder"
+        New-Item -Path $targetFolder -ItemType Directory | Out-Null
+
+        try {
+            New-DesktopShortcut -TargetFolder $targetFolder -ShortcutName 'Convert Photos'
+            Write-Success 'Created desktop shortcut: Convert Photos'
+        }
+        catch {
+            Write-Warn "Could not create desktop shortcut. $_"
+        }
+
+        Write-Host
+        Write-Info 'First-time setup complete.'
+        Write-Host "Place your HEIC photos in: $targetFolder"
+        Write-Host 'Then run this script again to start conversion.'
+        Wait-ForExit
+        return 0
     }
 
+    if (-not (Test-Path -LiteralPath $targetFolder -PathType Container)) {
+        Write-Failure "Folder not found: $targetFolder"
+        Wait-ForExit
+        return 1
+    }
+
+    $ffmpegCommand = Get-Command ffmpeg -ErrorAction SilentlyContinue
+    if (-not $ffmpegCommand) {
+        Show-FfmpegInstallHelp
+        Wait-ForExit
+        return 1
+    }
+
+    $ffmpegPath = $ffmpegCommand.Source
+    if (-not (Test-HeicSupport -FfmpegPath $ffmpegPath)) {
+        Show-HeicSupportHelp
+        Wait-ForExit
+        return 1
+    }
+
+    Write-Info "Scanning for HEIC files in: $targetFolder"
+
+    $heicFiles = @(Get-ChildItem -Path $targetFolder -Recurse -File | Where-Object {
+            $_.Extension -ieq '.heic'
+        })
+
+    if (-not $heicFiles -or $heicFiles.Count -eq 0) {
+        Write-Warn 'No HEIC files found. Add files and run again.'
+        Wait-ForExit
+        return 0
+    }
+
+    $convertedCount = 0
+    $skippedCount = 0
+    $failedCount = 0
+    $deletedCount = 0
+
+    Write-Info ("Found {0} HEIC file(s). Starting conversion..." -f $heicFiles.Count)
     Write-Host
+
+    foreach ($file in $heicFiles) {
+        $directory = $file.DirectoryName
+        $sourcePath = $file.FullName
+        $baseOutputName = "{0}_converted" -f $file.BaseName
+        $expectedOutput = Join-Path -Path $directory -ChildPath ("$baseOutputName.jpg")
+
+        if (Test-Path -LiteralPath $expectedOutput) {
+            Write-Warn "Skipping (already converted): $sourcePath"
+            $skippedCount++
+            continue
+        }
+
+        $outputPath = Get-UniqueOutputPath -Directory $directory -BaseName $baseOutputName -Extension '.jpg'
+
+        Write-Info "Converting: $sourcePath"
+        Write-Host "      -> $outputPath"
+
+        try {
+            & $ffmpegPath -hide_banner -loglevel error -i $sourcePath -q:v 2 $outputPath
+            if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $outputPath)) {
+                throw "ffmpeg exited with code $LASTEXITCODE"
+            }
+
+            $convertedCount++
+            Write-Success "Converted: $outputPath"
+
+            try {
+                Remove-Item -LiteralPath $sourcePath -Force
+                $deletedCount++
+                Write-Success "Deleted original: $sourcePath"
+            }
+            catch {
+                Write-Warn "Converted, but could not delete original: $sourcePath. $_"
+            }
+        }
+        catch {
+            $failedCount++
+            Write-Failure "Failed: $sourcePath"
+            Write-Host "       Reason: $_"
+        }
+
+        Write-Host
+    }
+
+    Write-Host 'Conversion complete.' -ForegroundColor Green
+    Write-Host ("Converted: {0}" -f $convertedCount)
+    Write-Host ("Skipped:   {0}" -f $skippedCount)
+    Write-Host ("Failed:    {0}" -f $failedCount)
+    Write-Host ("Deleted:   {0}" -f $deletedCount)
+
+    Wait-ForExit
+    return 0
 }
 
-Write-Host 'Conversion complete.' -ForegroundColor Green
-Write-Host ("Converted: {0}" -f $convertedCount)
-Write-Host ("Skipped:   {0}" -f $skippedCount)
-Write-Host ("Failed:    {0}" -f $failedCount)
-Write-Host ("Deleted:   {0}" -f $deletedCount)
-
-Wait-ForExit
-exit 0
+if ($MyInvocation.InvocationName -ne '.') {
+    $exitCode = Invoke-PhotoConversion -FolderPath $FolderPath
+    exit $exitCode
+}
