@@ -67,6 +67,7 @@ Describe 'convert-photos integration behavior' {
       $pwshPath = (Get-Command pwsh).Source
         New-Item -Path $inputFolder -ItemType Directory | Out-Null
         New-Item -Path $toolFolder -ItemType Directory | Out-Null
+        Set-Content -LiteralPath (Join-Path $inputFolder 'sample.heic') -Value 'heic-data' -Encoding ASCII
 
         @'
 @echo off
@@ -85,7 +86,7 @@ if /I "%~1"=="-hide_banner" (
     exit /b 0
   )
 )
-exit /b 0
+exit /b 1
 '@ | Set-Content -LiteralPath (Join-Path $toolFolder 'ffmpeg.cmd') -Encoding ASCII
 
         $originalPause = $env:HEIC_TO_JPG_NO_PAUSE

@@ -48,25 +48,43 @@ function Show-FfmpegInstallHelp {
 }
 
 function Show-HeicSupportHelp {
+    param([string]$SampleHeicPath)
+
     Write-Host
     Write-Warn 'ffmpeg is installed, but HEIC/HEIF support was not detected.'
+    Write-Host 'A real decode probe failed for the sample HEIC input.'
+
+    if (-not [string]::IsNullOrWhiteSpace($SampleHeicPath)) {
+        Write-Host "Probe file: $SampleHeicPath"
+    }
+
     Write-Host 'Install a full ffmpeg build that includes HEIF/HEIC decoding support.'
     Write-Host
-    Write-Host 'Try this command to inspect support:'
-    Write-Host 'ffmpeg -hide_banner -demuxers | findstr /I "heic heif"'
+    Write-Host 'Try this command to manually test decoding:'
+    if (-not [string]::IsNullOrWhiteSpace($SampleHeicPath)) {
+        Write-Host ("ffmpeg -hide_banner -loglevel error -i `"{0}`" -frames:v 1 -f null NUL" -f $SampleHeicPath)
+    }
+    else {
+        Write-Host 'ffmpeg -hide_banner -loglevel error -i "<your-file>.heic" -frames:v 1 -f null NUL'
+    }
     Write-Host
-    Write-Host 'If no HEIC/HEIF entry appears, install a different ffmpeg build and retry.'
+    Write-Host 'If this command fails, install a different ffmpeg build and retry.'
 }
 
 function Test-HeicSupport {
-    param([string]$FfmpegPath)
+    param(
+        [string]$FfmpegPath,
+        [string]$SampleHeicPath
+    )
+
+    if ([string]::IsNullOrWhiteSpace($SampleHeicPath) -or -not (Test-Path -LiteralPath $SampleHeicPath -PathType Leaf)) {
+        return $false
+    }
 
     try {
-        $demuxers = & $FfmpegPath -hide_banner -demuxers 2>&1 | Out-String
-        $decoders = & $FfmpegPath -hide_banner -decoders 2>&1 | Out-String
-        $codecs = & $FfmpegPath -hide_banner -codecs 2>&1 | Out-String
-        $combined = "$demuxers`n$decoders`n$codecs"
-        return ($combined -match '(?im)\bheic\b|\bheif\b')
+        # Real decode probe: try decoding one frame from an actual HEIC source.
+        & $FfmpegPath -hide_banner -loglevel error -i $SampleHeicPath -frames:v 1 -f null NUL 2>&1 | Out-Null
+        return ($LASTEXITCODE -eq 0)
     }
     catch {
         return $false
@@ -168,13 +186,6 @@ function Invoke-PhotoConversion {
         return 1
     }
 
-    $ffmpegPath = $ffmpegCommand.Source
-    if (-not (Test-HeicSupport -FfmpegPath $ffmpegPath)) {
-        Show-HeicSupportHelp
-        Wait-ForExit
-        return 1
-    }
-
     Write-Info "Scanning for HEIC files in: $targetFolder"
 
     $heicFiles = @(Get-ChildItem -Path $targetFolder -Recurse -File | Where-Object {
@@ -185,6 +196,14 @@ function Invoke-PhotoConversion {
         Write-Warn 'No HEIC files found. Add files and run again.'
         Wait-ForExit
         return 0
+    }
+
+    $ffmpegPath = $ffmpegCommand.Source
+    $probeFile = $heicFiles[0].FullName
+    if (-not (Test-HeicSupport -FfmpegPath $ffmpegPath -SampleHeicPath $probeFile)) {
+        Show-HeicSupportHelp -SampleHeicPath $probeFile
+        Wait-ForExit
+        return 1
     }
 
     $convertedCount = 0
