@@ -30,27 +30,9 @@ Create a PowerShell script (`convert-photos.ps1`) that:
 5. **Duplicate Filename Handling**: If a descriptive output name already exists for a different source, append a number to the output filename (e.g., `photo_converted_1.jpg`, `photo_converted_2.jpg`)
 6. **Already Converted Handling**: If the expected converted JPG already exists for a source HEIC file, skip that file and report it as already converted
 7. **File Deletion**: Delete original HEIC files after successful conversion
-8. **Folder Creation & Setup**: If using default folder (no parameter):
-   - Create `C:\Users\<username>\convert` folder if it doesn't exist
-
-- Create a desktop shortcut named `Convert Photos` pointing to the convert folder
-- Display instructions guiding user to place photos in the folder (only on first run when folder is created)
-- Exit after setup so the user can add photos before processing
-
-9. **Error Handling**: Gracefully handle cases where:
-   - No HEIC files are found in the folder
-   - ffmpeg is not available on PATH (display installation instructions)
-
-- ffmpeg is installed but does not support HEIC decoding (display specific guidance)
-- Conversion fails for individual files (log error, continue with others)
-- Custom folder path provided but doesn't exist (display error and exit)
-
-10. **User Feedback**: Display status messages showing:
-
-- Which files are being converted
-- Which files were skipped as already converted
-- When conversion is complete
-- Any errors encountered
+8. **Folder Creation & Setup**: If using default folder (no parameter), create `C:\Users\<username>\convert` if it doesn't exist, create a desktop shortcut named `Convert Photos` pointing to the convert folder, display instructions to place photos in the folder on first run, and exit after setup so the user can add photos before processing.
+9. **Error Handling**: Gracefully handle cases where no HEIC files are found, ffmpeg is not available on PATH, ffmpeg is installed but does not support HEIC decoding, conversion fails for individual files, or a custom folder path does not exist.
+10. **User Feedback**: Display status messages showing which files are being converted, which files were skipped as already converted, when conversion is complete, and any errors encountered.
 
 ### Non-Functional Requirements
 
@@ -95,7 +77,7 @@ Create a PowerShell script (`convert-photos.ps1`) that:
 
 ### User Workflow
 
-**Option 1: Default Folder (First Run)**
+#### Option 1: Default Folder (First Run)
 
 1. Run the script: `convert-photos.ps1`
 2. Script creates `C:\Users\<username>\convert` folder if it doesn't exist
@@ -108,7 +90,7 @@ Create a PowerShell script (`convert-photos.ps1`) that:
 9. Press any key when complete
 10. Find converted JPG files in the same folders as their source files
 
-**Option 1: Default Folder (Subsequent Runs)**
+#### Option 1: Default Folder (Subsequent Runs)
 
 1. Place HEIC photos into `C:\Users\<username>\convert` folder or its subfolders (or use desktop shortcut)
 2. Run the script: `convert-photos.ps1`
@@ -116,7 +98,7 @@ Create a PowerShell script (`convert-photos.ps1`) that:
 4. Press any key when complete
 5. Find converted JPG files in the same folders as their source files
 
-**Option 2: Custom Folder**
+#### Option 2: Custom Folder
 
 1. Run the script with a folder parameter: `convert-photos.ps1 -FolderPath "C:\path\to\photos"`
 2. Watch conversion progress in the command window
