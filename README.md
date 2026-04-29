@@ -56,6 +56,12 @@ Run it again after adding HEIC files.
 .\convert-photos.ps1 -FolderPath "C:\path\to\photos"
 ```
 
+Example with a relative path from the current directory:
+
+```powershell
+.\convert-photos.ps1 -FolderPath ".\photos"
+```
+
 If the custom folder does not exist, the script exits with an error message.
 
 ## Conversion Output Rules
@@ -66,8 +72,20 @@ If the custom folder does not exist, the script exits with an error message.
 
 ## Troubleshooting
 
+- If you get `The term 'convert-photos.ps1' is not recognized`, open a terminal in this repo folder and run:
+
+```powershell
+.\convert-photos.ps1
+```
+
+You can also run it with a full path:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "C:\path\to\convert-photos.ps1"
+```
+
 - If ffmpeg is missing, the script prints install instructions
-- If ffmpeg appears installed but HEIC support is missing, the script prints HEIC-specific guidance
+- If ffmpeg appears installed but HEIC support is missing, the script runs a real decode probe against a sample `.heic` file and then prints HEIC-specific guidance if that probe fails
 - If no HEIC files are found, the script reports that and exits cleanly
 
 ## Notes
