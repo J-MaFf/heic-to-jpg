@@ -45,10 +45,13 @@ On first run, the script:
 
 - Creates `C:\Users\<your-user>\convert` if missing
 - Creates a desktop shortcut named `Convert Photos` to that folder
+- Creates a desktop shortcut named `Run Photo Converter` to launch the script
 - Shows instructions to place photos in the folder
 - Exits without converting (first-run setup behavior)
 
 Run it again after adding HEIC files.
+
+In default-folder mode, the script also refreshes the `Run Photo Converter` shortcut so it points directly to PowerShell 7 when found in common install locations or via `pwsh` on PATH, then falls back to Windows PowerShell if PowerShell 7 is not available.
 
 ### Custom Folder Mode
 
