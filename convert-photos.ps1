@@ -4,6 +4,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+$script:ThisScriptPath = $PSCommandPath
 
 function Write-Info {
     param([string]$Message)
@@ -91,21 +92,88 @@ function Test-HeicSupport {
     }
 }
 
-function New-DesktopShortcut {
-    param(
-        [string]$TargetFolder,
-        [string]$ShortcutName
-    )
+function Get-DesktopShortcutPath {
+    param([string]$ShortcutName)
 
     $desktop = [Environment]::GetFolderPath('Desktop')
-    $shortcutPath = Join-Path -Path $desktop -ChildPath ("$ShortcutName.lnk")
+    return Join-Path -Path $desktop -ChildPath ("$ShortcutName.lnk")
+}
+
+function New-DesktopShortcut {
+    param(
+        [string]$ShortcutName,
+        [string]$TargetPath,
+        [string]$WorkingDirectory,
+        [string]$Arguments,
+        [string]$IconLocation
+    )
+
+    $shortcutPath = Get-DesktopShortcutPath -ShortcutName $ShortcutName
 
     $shell = New-Object -ComObject WScript.Shell
     $shortcut = $shell.CreateShortcut($shortcutPath)
-    $shortcut.TargetPath = $TargetFolder
-    $shortcut.WorkingDirectory = $TargetFolder
-    $shortcut.IconLocation = "$env:SystemRoot\System32\shell32.dll,3"
+    $shortcut.TargetPath = $TargetPath
+    $shortcut.WorkingDirectory = $WorkingDirectory
+
+    if (-not [string]::IsNullOrWhiteSpace($Arguments)) {
+        $shortcut.Arguments = $Arguments
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($IconLocation)) {
+        $shortcut.IconLocation = $IconLocation
+    }
+
     $shortcut.Save()
+}
+
+function Get-PreferredPowerShellPath {
+    $fallbackPath = Join-Path -Path $env:SystemRoot -ChildPath 'System32\WindowsPowerShell\v1.0\powershell.exe'
+    $candidatePaths = @(
+        (Join-Path -Path $env:ProgramFiles -ChildPath 'PowerShell\7\pwsh.exe'),
+        (Join-Path -Path $env:ProgramFiles -ChildPath 'PowerShell\7-preview\pwsh.exe')
+    )
+
+    if (-not [string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
+        $candidatePaths += Join-Path -Path $env:LOCALAPPDATA -ChildPath 'Microsoft\WindowsApps\pwsh.exe'
+    }
+
+    $pwshCommand = Get-Command pwsh -CommandType Application -ErrorAction SilentlyContinue
+    if ($pwshCommand) {
+        $candidatePaths += $pwshCommand.Source
+    }
+
+    $preferredPath = $candidatePaths |
+    Where-Object { -not [string]::IsNullOrWhiteSpace($_) -and (Test-Path -LiteralPath $_) } |
+    Select-Object -Unique |
+    Select-Object -First 1
+
+    if (-not [string]::IsNullOrWhiteSpace($preferredPath)) {
+        return $preferredPath
+    }
+
+    return $fallbackPath
+}
+
+function Get-ScriptLauncherShortcutDefinition {
+    param([string]$ScriptPath)
+
+    $launcherPath = Get-PreferredPowerShellPath
+    $scriptDirectory = Split-Path -Path $ScriptPath -Parent
+
+    return @{
+        ShortcutName     = 'Run Photo Converter'
+        TargetPath       = $launcherPath
+        WorkingDirectory = $scriptDirectory
+        Arguments        = "-NoProfile -ExecutionPolicy Bypass -File `"$ScriptPath`""
+        IconLocation     = "$launcherPath,0"
+    }
+}
+
+function Ensure-ScriptLauncherShortcut {
+    param([string]$ScriptPath)
+
+    $definition = Get-ScriptLauncherShortcutDefinition -ScriptPath $ScriptPath
+    New-DesktopShortcut @definition
 }
 
 function Get-UniqueOutputPath {
@@ -158,11 +226,19 @@ function Invoke-PhotoConversion {
         New-Item -Path $targetFolder -ItemType Directory | Out-Null
 
         try {
-            New-DesktopShortcut -TargetFolder $targetFolder -ShortcutName 'Convert Photos'
+            New-DesktopShortcut -ShortcutName 'Convert Photos' -TargetPath $targetFolder -WorkingDirectory $targetFolder -IconLocation "$env:SystemRoot\System32\shell32.dll,3"
             Write-Success 'Created desktop shortcut: Convert Photos'
         }
         catch {
             Write-Warn "Could not create desktop shortcut. $_"
+        }
+
+        try {
+            Ensure-ScriptLauncherShortcut -ScriptPath $script:ThisScriptPath
+            Write-Success 'Created desktop shortcut: Run Photo Converter'
+        }
+        catch {
+            Write-Warn "Could not create script shortcut. $_"
         }
 
         Write-Host
@@ -171,6 +247,15 @@ function Invoke-PhotoConversion {
         Write-Host 'Then run this script again to start conversion.'
         Wait-ForExit
         return 0
+    }
+
+    if ($usingDefaultFolder) {
+        try {
+            Ensure-ScriptLauncherShortcut -ScriptPath $script:ThisScriptPath
+        }
+        catch {
+            Write-Warn "Could not create script shortcut. $_"
+        }
     }
 
     if (-not (Test-Path -LiteralPath $targetFolder -PathType Container)) {
