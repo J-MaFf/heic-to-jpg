@@ -6,26 +6,58 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $script:ThisScriptPath = $PSCommandPath
 
+<#
+.SYNOPSIS
+Writes an informational status message.
+
+.PARAMETER Message
+The message text to display.
+#>
 function Write-Info {
     param([string]$Message)
     Write-Host "[INFO] $Message" -ForegroundColor Cyan
 }
 
+<#
+.SYNOPSIS
+Writes a success status message.
+
+.PARAMETER Message
+The message text to display.
+#>
 function Write-Success {
     param([string]$Message)
     Write-Host "[OK]   $Message" -ForegroundColor Green
 }
 
+<#
+.SYNOPSIS
+Writes a warning status message.
+
+.PARAMETER Message
+The message text to display.
+#>
 function Write-Warn {
     param([string]$Message)
     Write-Host "[WARN] $Message" -ForegroundColor Yellow
 }
 
+<#
+.SYNOPSIS
+Writes an error status message.
+
+.PARAMETER Message
+The message text to display.
+#>
 function Write-Failure {
     param([string]$Message)
     Write-Host "[ERR]  $Message" -ForegroundColor Red
 }
 
+<#
+.SYNOPSIS
+Pauses before exit unless automation has disabled prompts.
+#>
 function Wait-ForExit {
     if ($env:HEIC_TO_JPG_NO_PAUSE -eq '1') {
         return
@@ -35,6 +67,10 @@ function Wait-ForExit {
     Read-Host 'Press Enter to exit'
 }
 
+<#
+.SYNOPSIS
+Shows installation guidance when ffmpeg is missing from PATH.
+#>
 function Show-FfmpegInstallHelp {
     Write-Host
     Write-Warn 'ffmpeg was not found on PATH.'
@@ -48,6 +84,13 @@ function Show-FfmpegInstallHelp {
     Write-Host 'After install, open a new terminal and run: ffmpeg -version'
 }
 
+<#
+.SYNOPSIS
+Shows troubleshooting guidance when ffmpeg cannot decode HEIC files.
+
+.PARAMETER SampleHeicPath
+The sample HEIC file used for the decode probe.
+#>
 function Show-HeicSupportHelp {
     param([string]$SampleHeicPath)
 
@@ -72,6 +115,16 @@ function Show-HeicSupportHelp {
     Write-Host 'If this command fails, install a different ffmpeg build and retry.'
 }
 
+<#
+.SYNOPSIS
+Tests whether the installed ffmpeg build can decode a HEIC file.
+
+.PARAMETER FfmpegPath
+The full path to the ffmpeg executable.
+
+.PARAMETER SampleHeicPath
+The HEIC file used for the decode probe.
+#>
 function Test-HeicSupport {
     param(
         [string]$FfmpegPath,
@@ -92,6 +145,13 @@ function Test-HeicSupport {
     }
 }
 
+<#
+.SYNOPSIS
+Builds the full desktop shortcut path for a shortcut name.
+
+.PARAMETER ShortcutName
+The shortcut name without the .lnk extension.
+#>
 function Get-DesktopShortcutPath {
     param([string]$ShortcutName)
 
@@ -99,6 +159,25 @@ function Get-DesktopShortcutPath {
     return Join-Path -Path $desktop -ChildPath ("$ShortcutName.lnk")
 }
 
+<#
+.SYNOPSIS
+Creates or updates a desktop shortcut.
+
+.PARAMETER ShortcutName
+The shortcut name without the .lnk extension.
+
+.PARAMETER TargetPath
+The executable or folder the shortcut should open.
+
+.PARAMETER WorkingDirectory
+The working directory assigned to the shortcut.
+
+.PARAMETER Arguments
+Optional command-line arguments for the shortcut target.
+
+.PARAMETER IconLocation
+Optional icon resource path for the shortcut.
+#>
 function New-DesktopShortcut {
     param(
         [string]$ShortcutName,
@@ -126,6 +205,10 @@ function New-DesktopShortcut {
     $shortcut.Save()
 }
 
+<#
+.SYNOPSIS
+Finds the best PowerShell executable to use for the launcher shortcut.
+#>
 function Get-PreferredPowerShellPath {
     $fallbackPath = Join-Path -Path $env:SystemRoot -ChildPath 'System32\WindowsPowerShell\v1.0\powershell.exe'
     $candidatePaths = @(
@@ -154,6 +237,13 @@ function Get-PreferredPowerShellPath {
     return $fallbackPath
 }
 
+<#
+.SYNOPSIS
+Builds the shortcut definition used to launch this script from the desktop.
+
+.PARAMETER ScriptPath
+The full path to the script file.
+#>
 function Get-ScriptLauncherShortcutDefinition {
     param([string]$ScriptPath)
 
@@ -169,13 +259,33 @@ function Get-ScriptLauncherShortcutDefinition {
     }
 }
 
-function Ensure-ScriptLauncherShortcut {
+<#
+.SYNOPSIS
+Creates or refreshes the desktop shortcut that launches this script.
+
+.PARAMETER ScriptPath
+The full path to the script file.
+#>
+function Set-ScriptLauncherShortcut {
     param([string]$ScriptPath)
 
     $definition = Get-ScriptLauncherShortcutDefinition -ScriptPath $ScriptPath
     New-DesktopShortcut @definition
 }
 
+<#
+.SYNOPSIS
+Returns a non-conflicting output path for a converted image.
+
+.PARAMETER Directory
+The directory where the output file should be created.
+
+.PARAMETER BaseName
+The base file name without an extension.
+
+.PARAMETER Extension
+The file extension to append to the generated name.
+#>
 function Get-UniqueOutputPath {
     param(
         [string]$Directory,
@@ -198,6 +308,13 @@ function Get-UniqueOutputPath {
     }
 }
 
+<#
+.SYNOPSIS
+Runs the HEIC-to-JPG conversion workflow for the target folder.
+
+.PARAMETER FolderPath
+An optional folder to process. When omitted, the default convert folder under the user profile is used.
+#>
 function Invoke-PhotoConversion {
     param(
         [string]$FolderPath
@@ -234,7 +351,7 @@ function Invoke-PhotoConversion {
         }
 
         try {
-            Ensure-ScriptLauncherShortcut -ScriptPath $script:ThisScriptPath
+            Set-ScriptLauncherShortcut -ScriptPath $script:ThisScriptPath
             Write-Success 'Created desktop shortcut: Run Photo Converter'
         }
         catch {
@@ -251,7 +368,7 @@ function Invoke-PhotoConversion {
 
     if ($usingDefaultFolder) {
         try {
-            Ensure-ScriptLauncherShortcut -ScriptPath $script:ThisScriptPath
+            Set-ScriptLauncherShortcut -ScriptPath $script:ThisScriptPath
         }
         catch {
             Write-Warn "Could not create script shortcut. $_"
