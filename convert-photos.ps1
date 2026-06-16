@@ -486,6 +486,9 @@ function Invoke-PhotoConversion {
     Write-Host ("Deleted:   {0}" -f $deletedCount)
 
     Wait-ForExit
+    if ($failedCount -gt 0) {
+        return 1
+    }
     return 0
 }
 
