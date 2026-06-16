@@ -299,13 +299,15 @@ function Get-UniqueOutputPath {
     }
 
     $counter = 1
-    while ($true) {
+    $maxIterations = 9999
+    while ($counter -le $maxIterations) {
         $numbered = Join-Path -Path $Directory -ChildPath ("{0}_{1}{2}" -f $BaseName, $counter, $Extension)
         if (-not (Test-Path -LiteralPath $numbered)) {
             return $numbered
         }
         $counter++
     }
+    throw "Get-UniqueOutputPath: could not find a unique name for '$BaseName$Extension' after $maxIterations attempts. Check for a full disk or permission error."
 }
 
 <#
