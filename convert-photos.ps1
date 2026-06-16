@@ -137,7 +137,7 @@ function Test-HeicSupport {
 
     try {
         # Real decode probe: try decoding one frame from an actual HEIC source.
-        & $FfmpegPath -hide_banner -loglevel error -i $SampleHeicPath -frames:v 1 -f null NUL 2>&1 | Out-Null
+        & $FfmpegPath -hide_banner -loglevel error -i "$SampleHeicPath" -frames:v 1 -f null NUL 2>&1 | Out-Null
         return ($LASTEXITCODE -eq 0)
     }
     catch {
@@ -434,7 +434,7 @@ function Invoke-PhotoConversion {
         Write-Host "      -> $outputPath"
 
         try {
-            & $ffmpegPath -hide_banner -loglevel error -i $sourcePath -q:v 2 $outputPath
+            & $ffmpegPath -hide_banner -loglevel error -i "$sourcePath" -q:v 2 "$outputPath"
             if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $outputPath)) {
                 throw "ffmpeg exited with code $LASTEXITCODE"
             }
