@@ -1,5 +1,6 @@
 param(
-    [string]$FolderPath
+    [string]$FolderPath,
+    [switch]$DryRun
 )
 
 Set-StrictMode -Version Latest
@@ -137,7 +138,7 @@ function Test-HeicSupport {
 
     try {
         # Real decode probe: try decoding one frame from an actual HEIC source.
-        & $FfmpegPath -hide_banner -loglevel error -i $SampleHeicPath -frames:v 1 -f null NUL 2>&1 | Out-Null
+        & $FfmpegPath -hide_banner -loglevel error -i "$SampleHeicPath" -frames:v 1 -f null NUL 2>&1 | Out-Null
         return ($LASTEXITCODE -eq 0)
     }
     catch {
@@ -299,13 +300,15 @@ function Get-UniqueOutputPath {
     }
 
     $counter = 1
-    while ($true) {
+    $maxIterations = 9999
+    while ($counter -le $maxIterations) {
         $numbered = Join-Path -Path $Directory -ChildPath ("{0}_{1}{2}" -f $BaseName, $counter, $Extension)
         if (-not (Test-Path -LiteralPath $numbered)) {
             return $numbered
         }
         $counter++
     }
+    throw "Get-UniqueOutputPath: could not find a unique name for '$BaseName$Extension' after $maxIterations attempts. Check for a full disk or permission error."
 }
 
 <#
@@ -317,7 +320,8 @@ An optional folder to process. When omitted, the default convert folder under th
 #>
 function Invoke-PhotoConversion {
     param(
-        [string]$FolderPath
+        [string]$FolderPath,
+        [switch]$DryRun
     )
 
     $defaultFolder = Join-Path -Path $env:USERPROFILE -ChildPath 'convert'
@@ -413,6 +417,9 @@ function Invoke-PhotoConversion {
     $failedCount = 0
     $deletedCount = 0
 
+    if ($DryRun) {
+        Write-Warn 'DRY RUN — no files will be converted or deleted.'
+    }
     Write-Info ("Found {0} HEIC file(s). Starting conversion..." -f $heicFiles.Count)
     Write-Host
 
@@ -433,44 +440,59 @@ function Invoke-PhotoConversion {
         Write-Info "Converting: $sourcePath"
         Write-Host "      -> $outputPath"
 
-        try {
-            & $ffmpegPath -hide_banner -loglevel error -i $sourcePath -q:v 2 $outputPath
-            if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $outputPath)) {
-                throw "ffmpeg exited with code $LASTEXITCODE"
-            }
-
+        if ($DryRun) {
+            Write-Warn "[DRY RUN] Would convert: $sourcePath"
+            Write-Warn "[DRY RUN] Would delete original: $sourcePath"
             $convertedCount++
-            Write-Success "Converted: $outputPath"
-
+        }
+        else {
             try {
-                Remove-Item -LiteralPath $sourcePath -Force
-                $deletedCount++
-                Write-Success "Deleted original: $sourcePath"
+                & $ffmpegPath -hide_banner -loglevel error -i "$sourcePath" -q:v 2 "$outputPath"
+                if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $outputPath)) {
+                    throw "ffmpeg exited with code $LASTEXITCODE"
+                }
+
+                $convertedCount++
+                Write-Success "Converted: $outputPath"
+
+                try {
+                    Remove-Item -LiteralPath $sourcePath -Force
+                    $deletedCount++
+                    Write-Success "Deleted original: $sourcePath"
+                }
+                catch {
+                    Write-Warn "Converted, but could not delete original: $sourcePath. $_"
+                }
             }
             catch {
-                Write-Warn "Converted, but could not delete original: $sourcePath. $_"
+                $failedCount++
+                Write-Failure "Failed: $sourcePath"
+                Write-Host "       Reason: $_"
             }
-        }
-        catch {
-            $failedCount++
-            Write-Failure "Failed: $sourcePath"
-            Write-Host "       Reason: $_"
         }
 
         Write-Host
     }
 
-    Write-Host 'Conversion complete.' -ForegroundColor Green
+    if ($DryRun) {
+        Write-Warn 'DRY RUN complete — no files were changed.'
+    }
+    else {
+        Write-Host 'Conversion complete.' -ForegroundColor Green
+    }
     Write-Host ("Converted: {0}" -f $convertedCount)
     Write-Host ("Skipped:   {0}" -f $skippedCount)
     Write-Host ("Failed:    {0}" -f $failedCount)
     Write-Host ("Deleted:   {0}" -f $deletedCount)
 
     Wait-ForExit
+    if ($failedCount -gt 0) {
+        return 1
+    }
     return 0
 }
 
 if ($MyInvocation.InvocationName -ne '.') {
-    $exitCode = Invoke-PhotoConversion -FolderPath $FolderPath
+    $exitCode = Invoke-PhotoConversion -FolderPath $FolderPath -DryRun:$DryRun
     exit $exitCode
 }

@@ -6,7 +6,7 @@ Describe 'convert-photos integration behavior' {
 
     try {
       $env:HEIC_TO_JPG_NO_PAUSE = '1'
-      & $pwshPath -NoProfile -File 'C:\Users\jmaffiola\Documents\Scripts\heic-to-jpg\convert-photos.ps1' -FolderPath $missingFolder | Out-Null
+      & $pwshPath -NoProfile -File "$PSScriptRoot\..\convert-photos.ps1" -FolderPath $missingFolder | Out-Null
       $LASTEXITCODE | Should -Be 1
     }
     finally {
@@ -26,7 +26,7 @@ Describe 'convert-photos integration behavior' {
       $env:HEIC_TO_JPG_NO_PAUSE = '1'
       $env:USERPROFILE = $profilePath
 
-      & $pwshPath -NoProfile -File 'C:\Users\jmaffiola\Documents\Scripts\heic-to-jpg\convert-photos.ps1' | Out-Null
+      & $pwshPath -NoProfile -File "$PSScriptRoot\..\convert-photos.ps1" | Out-Null
 
       $LASTEXITCODE | Should -Be 0
       (Test-Path -LiteralPath (Join-Path $profilePath 'convert')) | Should -BeTrue
@@ -51,7 +51,7 @@ Describe 'convert-photos integration behavior' {
       $env:HEIC_TO_JPG_NO_PAUSE = '1'
       $env:PATH = $pathWithoutFfmpeg
 
-      & $pwshPath -NoProfile -File 'C:\Users\jmaffiola\Documents\Scripts\heic-to-jpg\convert-photos.ps1' -FolderPath $inputFolder | Out-Null
+      & $pwshPath -NoProfile -File "$PSScriptRoot\..\convert-photos.ps1" -FolderPath $inputFolder | Out-Null
 
       $LASTEXITCODE | Should -Be 1
     }
@@ -96,7 +96,7 @@ exit /b 1
       $env:HEIC_TO_JPG_NO_PAUSE = '1'
       $env:PATH = "$toolFolder;$originalPath"
 
-      & $pwshPath -NoProfile -File 'C:\Users\jmaffiola\Documents\Scripts\heic-to-jpg\convert-photos.ps1' -FolderPath $inputFolder | Out-Null
+      & $pwshPath -NoProfile -File "$PSScriptRoot\..\convert-photos.ps1" -FolderPath $inputFolder | Out-Null
 
       $LASTEXITCODE | Should -Be 1
     }
@@ -149,7 +149,7 @@ exit /b 0
       $env:HEIC_TO_JPG_NO_PAUSE = '1'
       $env:PATH = "$toolFolder;$originalPath"
 
-      & $pwshPath -NoProfile -File 'C:\Users\jmaffiola\Documents\Scripts\heic-to-jpg\convert-photos.ps1' -FolderPath $inputFolder | Out-Null
+      & $pwshPath -NoProfile -File "$PSScriptRoot\..\convert-photos.ps1" -FolderPath $inputFolder | Out-Null
 
       $LASTEXITCODE | Should -Be 0
     }
@@ -205,7 +205,7 @@ exit /b 0
       $env:HEIC_TO_JPG_NO_PAUSE = '1'
       $env:PATH = "$toolFolder;$originalPath"
 
-      & $pwshPath -NoProfile -File 'C:\Users\jmaffiola\Documents\Scripts\heic-to-jpg\convert-photos.ps1' -FolderPath $inputFolder | Out-Null
+      & $pwshPath -NoProfile -File "$PSScriptRoot\..\convert-photos.ps1" -FolderPath $inputFolder | Out-Null
 
       $LASTEXITCODE | Should -Be 0
       (Test-Path -LiteralPath $source) | Should -BeFalse
@@ -265,7 +265,7 @@ exit /b 0
       $env:HEIC_TO_JPG_NO_PAUSE = '1'
       $env:PATH = "$toolFolder;$originalPath"
 
-      & $pwshPath -NoProfile -File 'C:\Users\jmaffiola\Documents\Scripts\heic-to-jpg\convert-photos.ps1' -FolderPath $inputFolder | Out-Null
+      & $pwshPath -NoProfile -File "$PSScriptRoot\..\convert-photos.ps1" -FolderPath $inputFolder | Out-Null
 
       $LASTEXITCODE | Should -Be 0
       (Test-Path -LiteralPath $source) | Should -BeTrue
@@ -281,7 +281,7 @@ exit /b 0
 
 Describe 'shortcut launcher definition' {
   BeforeAll {
-    . 'C:\Users\jmaffiola\Documents\Scripts\heic-to-jpg\convert-photos.ps1'
+    . "$PSScriptRoot\..\convert-photos.ps1"
   }
 
   It 'prefers a common pwsh install path for the launcher shortcut' {
