@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Moved `plan.md` from the repo root to `docs/plan.md` to reduce root clutter ([#10](https://github.com/J-MaFf/heic-to-jpg/pull/16))
 
 ### Fixed
+- Original HEIC files that were "already converted" on a prior run are now deleted when found, instead of being skipped and left behind forever. The delete is guarded: the source is removed only when the expected `_converted.jpg` exists and is non-empty, so a source is never deleted without a confirmed, valid output ([#4](https://github.com/J-MaFf/heic-to-jpg/issues/4))
 - `Invoke-PhotoConversion` now returns exit code `1` when `$failedCount > 0`, so callers (CI, wrapper scripts) can distinguish a partial-failure run from a clean run ([#11](https://github.com/J-MaFf/heic-to-jpg/pull/17))
 - Added a 9999-iteration guard to `Get-UniqueOutputPath` so the function throws a descriptive error instead of spinning indefinitely when the filesystem is full or `Test-Path` misbehaves ([#8](https://github.com/J-MaFf/heic-to-jpg/pull/14))
 - Replaced hardcoded developer absolute path in `tests/convert-photos.Tests.ps1` (8 occurrences) with `"$PSScriptRoot\..\convert-photos.ps1"` so the test suite resolves correctly on any machine ([#7](https://github.com/J-MaFf/heic-to-jpg/pull/13))
