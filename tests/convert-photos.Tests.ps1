@@ -217,7 +217,7 @@ exit /b 0
     }
   }
 
-  It 'skips files already converted and keeps original HEIC' {
+  It 'deletes the original HEIC when an existing converted JPG is found' {
     $inputFolder = Join-Path $TestDrive 'skip-existing'
     $toolFolder = Join-Path $TestDrive 'tools-heic-skip'
     $pwshPath = (Get-Command pwsh).Source
@@ -268,8 +268,72 @@ exit /b 0
       & $pwshPath -NoProfile -File "$PSScriptRoot\..\convert-photos.ps1" -FolderPath $inputFolder | Out-Null
 
       $LASTEXITCODE | Should -Be 0
-      (Test-Path -LiteralPath $source) | Should -BeTrue
+      # Already converted on a prior run: the original HEIC should now be removed.
+      (Test-Path -LiteralPath $source) | Should -BeFalse
+      # The existing converted JPG must be preserved (no re-conversion, no new numbered copy).
       (Test-Path -LiteralPath $expectedJpg) | Should -BeTrue
+      (Test-Path -LiteralPath (Join-Path $inputFolder 'photo_converted_1.jpg')) | Should -BeFalse
+    }
+    finally {
+      $env:HEIC_TO_JPG_NO_PAUSE = $originalPause
+      $env:PATH = $originalPath
+    }
+  }
+
+  It 'keeps the original HEIC when the existing converted JPG is empty' {
+    $inputFolder = Join-Path $TestDrive 'skip-existing-empty'
+    $toolFolder = Join-Path $TestDrive 'tools-heic-skip-empty'
+    $pwshPath = (Get-Command pwsh).Source
+    New-Item -Path $inputFolder -ItemType Directory | Out-Null
+    New-Item -Path $toolFolder -ItemType Directory | Out-Null
+
+    $source = Join-Path $inputFolder 'photo.heic'
+    $expectedJpg = Join-Path $inputFolder 'photo_converted.jpg'
+    Set-Content -LiteralPath $source -Value 'heic-data' -Encoding ASCII
+    # Zero-byte / invalid existing output: must not trigger deletion of the source.
+    New-Item -Path $expectedJpg -ItemType File | Out-Null
+
+    @'
+@echo off
+setlocal EnableDelayedExpansion
+if /I "%~1"=="-hide_banner" (
+  if /I "%~2"=="-demuxers" (
+    echo D  heic
+    exit /b 0
+  )
+  if /I "%~2"=="-decoders" (
+    echo V....D hevc
+    exit /b 0
+  )
+  if /I "%~2"=="-codecs" (
+    echo DEVILS heic
+    exit /b 0
+  )
+)
+set "last="
+:nextarg
+if "%~1"=="" goto gotlast
+set "last=%~1"
+shift
+goto nextarg
+:gotlast
+if "%last%"=="" exit /b 1
+> "%last%" echo fake-jpg
+exit /b 0
+'@ | Set-Content -LiteralPath (Join-Path $toolFolder 'ffmpeg.cmd') -Encoding ASCII
+
+    $originalPause = $env:HEIC_TO_JPG_NO_PAUSE
+    $originalPath = $env:PATH
+
+    try {
+      $env:HEIC_TO_JPG_NO_PAUSE = '1'
+      $env:PATH = "$toolFolder;$originalPath"
+
+      & $pwshPath -NoProfile -File "$PSScriptRoot\..\convert-photos.ps1" -FolderPath $inputFolder | Out-Null
+
+      $LASTEXITCODE | Should -Be 0
+      # Guard: existing output is empty/invalid, so the original must be preserved.
+      (Test-Path -LiteralPath $source) | Should -BeTrue
       (Test-Path -LiteralPath (Join-Path $inputFolder 'photo_converted_1.jpg')) | Should -BeFalse
     }
     finally {

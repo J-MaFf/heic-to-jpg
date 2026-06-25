@@ -432,6 +432,32 @@ function Invoke-PhotoConversion {
         if (Test-Path -LiteralPath $expectedOutput) {
             Write-Warn "Skipping (already converted): $sourcePath"
             $skippedCount++
+
+            # The source was already converted on a prior run. The intended end
+            # state is JPG present, original HEIC removed, so delete the original
+            # now. Guard the delete: only remove the HEIC when the expected JPG
+            # actually exists and is non-empty, so we never delete a source
+            # without a confirmed, valid output.
+            $expectedOutputItem = Get-Item -LiteralPath $expectedOutput -ErrorAction SilentlyContinue
+            if ($expectedOutputItem -and $expectedOutputItem.Length -gt 0) {
+                if ($DryRun) {
+                    Write-Warn "[DRY RUN] Would delete original: $sourcePath"
+                }
+                else {
+                    try {
+                        Remove-Item -LiteralPath $sourcePath -Force
+                        $deletedCount++
+                        Write-Success "Deleted original (already converted): $sourcePath"
+                    }
+                    catch {
+                        Write-Warn "Already converted, but could not delete original: $sourcePath. $_"
+                    }
+                }
+            }
+            else {
+                Write-Warn "Existing output is missing or empty; keeping original: $sourcePath"
+            }
+
             continue
         }
 
