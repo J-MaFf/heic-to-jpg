@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `-DryRun` switch: when passed, the script lists which files would be converted and deleted without performing any actual operations, so users can verify what will be touched before committing ([#9](https://github.com/J-MaFf/heic-to-jpg/pull/15))
 
 ### Changed
+- `claude.yml` now calls the shared reusable Claude workflow in [J-MaFf/.github](https://github.com/J-MaFf/.github) instead of carrying its own copy ([#23](https://github.com/J-MaFf/heic-to-jpg/pull/23))
 - Moved `plan.md` from the repo root to `docs/plan.md` to reduce root clutter ([#10](https://github.com/J-MaFf/heic-to-jpg/pull/16))
 
 ### Fixed
